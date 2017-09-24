@@ -22,6 +22,7 @@ namespace PoseRecorder
         private List<float> sortedKeys;
 
         private bool isPlaying = false;
+        private float currentTime = 0f;
         private int currentFrame = 0;
         private int totalFrames = 0;
 
@@ -38,7 +39,7 @@ namespace PoseRecorder
             LoadPoseData();
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             if (!isPlaying)
             {
@@ -46,26 +47,69 @@ namespace PoseRecorder
                 {
                     isPlaying = true;
                     currentFrame = 0;
+                    currentTime = 0f;
                     Debug.Log("===STARTED PLAYING ANIMATION===");
+                    currentPose = poseDict[sortedKeys[currentFrame++]];
+                    poseHandler.SetHumanPose(ref currentPose);
                 }
-            }
-        }
-
-        private void FixedUpdate()
-        {
-            if (isPlaying)
+            } else
             {
-                if (currentFrame >= totalFrames)
+                if (currentFrame >= totalFrames - 1)
                 {
                     isPlaying = false;
                     Debug.Log("===FINISHED PLAYING ANIMATION===");
                 }
                 else
                 {
-                    currentPose = poseDict[sortedKeys[currentFrame++]];
-                    poseHandler.SetHumanPose(ref currentPose);
+                    float oldTime = currentTime;
+                    currentTime += Time.deltaTime;
+                    float startFrameTime;
+                    float endFrameTime;
+                    while (currentFrame < totalFrames - 1)
+                    {
+                        startFrameTime = sortedKeys[currentFrame];
+                        endFrameTime = sortedKeys[currentFrame + 1];
+                        if (startFrameTime <= currentTime && endFrameTime >= currentTime)
+                        {
+                            float progessThroughFrame = (currentTime - oldTime) / (endFrameTime - oldTime);
+                            if (progessThroughFrame > 1 || progessThroughFrame < 0)
+                            {
+                                Debug.LogError("***FRAME PROGRESS ERROR***");
+                                Debug.LogError("Progress: " + progessThroughFrame + " Current Time: " + currentTime + " Current Frame: " + currentFrame);
+                                return;
+                            }
+                            currentPose = getPoseLerp(progessThroughFrame, currentPose, poseDict[endFrameTime]);
+                            poseHandler.SetHumanPose(ref currentPose);
+                            return;
+                        } else
+                        {
+                            currentFrame++;
+                        }
+                    }
                 }
             }
+        }
+
+        private HumanPose getPoseLerp(float progress, HumanPose currentPose, HumanPose nextPose)
+        {
+            HumanPose poseToReturn = new HumanPose();
+            poseToReturn.bodyPosition = Vector3.Lerp(currentPose.bodyPosition, nextPose.bodyPosition, progress);
+            poseToReturn.bodyRotation = Quaternion.Lerp(currentPose.bodyRotation, nextPose.bodyRotation, progress);
+
+            int minMuscles = currentPose.muscles.Length >= nextPose.muscles.Length ? currentPose.muscles.Length : nextPose.muscles.Length;
+            float[] newMuscles = new float[minMuscles];
+            for (int i = 0; i < minMuscles; i++)
+            {
+                newMuscles[i] = Mathf.Lerp(currentPose.muscles[i], nextPose.muscles[i], progress);
+            }
+            poseToReturn.muscles = newMuscles;
+            return poseToReturn;
+        }
+
+        private void SetPose()
+        {
+            currentPose = poseDict[sortedKeys[currentFrame++]];
+            poseHandler.SetHumanPose(ref currentPose);
         }
 
         private void LoadPoseData()

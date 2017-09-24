@@ -2,7 +2,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
@@ -124,7 +123,7 @@ namespace PoseRecorder {
             poseDict = new Dictionary<float, RecordablePose>(frameNo);
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             if (recording)
             {
@@ -133,7 +132,12 @@ namespace PoseRecorder {
                     recording = false;
                     Debug.Log("===END RECORDING===");
                     SavePoseData();
+                } else
+                {
+                    currentTime += Time.deltaTime;
+                    UpdatePose();
                 }
+
             } else
             {
                 if (rightDevice.GetPress(startRecordKey))
@@ -141,23 +145,20 @@ namespace PoseRecorder {
                     Debug.Log("===START RECORDING===");
                     currentTime = 0f;
                     recording = true;
+                    UpdatePose();
                 }
             }
         }
 
-        private void FixedUpdate()
+        private void UpdatePose()
         {
-            if (recording)
-            {
-                poseHandler.GetHumanPose(ref poseData);
-                recordablePose = new RecordablePose();
-                recordablePose.bodyPosition = poseData.bodyPosition;
-                recordablePose.bodyRotation = poseData.bodyRotation;
-                recordablePose.muscles = (float[])poseData.muscles.Clone();
+            poseHandler.GetHumanPose(ref poseData);
+            recordablePose = new RecordablePose();
+            recordablePose.bodyPosition = poseData.bodyPosition;
+            recordablePose.bodyRotation = poseData.bodyRotation;
+            recordablePose.muscles = (float[])poseData.muscles.Clone();
 
-                poseDict.Add(currentTime, recordablePose);
-                currentTime += Time.fixedDeltaTime;
-            }
+            poseDict.Add(currentTime, recordablePose);
         }
 
         private void SavePoseData()
