@@ -72,17 +72,20 @@ namespace PoseRecorder {
             return obj;
         }
     }
-
+    [ExecuteInEditMode]
     public class HumanPoseRecorder : MonoBehaviour, TimelineCallable.TimelineCallable
     {
-        public int frameNo = 1000;
+        public string savePath;
+        public string fileName;
 
-        [Header("VR")]
         public SteamVR_TrackedObject leftHand;
         public SteamVR_TrackedObject rightHand;
 
         public Valve.VR.EVRButtonId startRecordKey = EVRButtonId.k_EButton_Grip;
         public Valve.VR.EVRButtonId stopRecordKey = EVRButtonId.k_EButton_SteamVR_Touchpad;
+
+        public bool recordLimitedFrames = false;
+        public int frameNo = 1000;
 
         private Avatar avatar;
         private HumanPoseHandler poseHandler;
@@ -91,9 +94,9 @@ namespace PoseRecorder {
 
         private Dictionary<float, RecordablePose> poseDict;
         private float currentTime;
+        private int currentFrame;
 
         private bool recording = false;
-        private string saveLocation;
 
         public SteamVR_Controller.Device leftDevice
         {
@@ -119,7 +122,6 @@ namespace PoseRecorder {
                 Debug.LogError("No Avatar Found!");
                 return;
             }
-            saveLocation = Application.dataPath + "/Animations/TestAnimation.pose";
             poseHandler = new HumanPoseHandler(avatar, transform);
             poseDict = new Dictionary<float, RecordablePose>(frameNo);
         }
@@ -135,6 +137,10 @@ namespace PoseRecorder {
                 {
                     currentTime += Time.deltaTime;
                     UpdatePose();
+                    if (recordLimitedFrames && currentFrame >= frameNo)
+                    {
+                        StopRecording();
+                    }
                 }
 
             } else
@@ -148,8 +154,14 @@ namespace PoseRecorder {
 
         public void StartRecording()
         {
+            if (fileName == null || savePath == null)
+            {
+                Debug.LogError("***NO PATH SET***");
+                return;
+            }
             Debug.Log("===START RECORDING===");
             currentTime = 0f;
+            currentFrame = 0;
             recording = true;
             UpdatePose();
         }
@@ -170,6 +182,7 @@ namespace PoseRecorder {
             recordablePose.muscles = (float[])poseData.muscles.Clone();
 
             poseDict.Add(currentTime, recordablePose);
+            currentFrame++;
         }
 
         private void SavePoseData()
@@ -185,7 +198,7 @@ namespace PoseRecorder {
             surrogateSelector.AddSurrogate(typeof(Quaternion), new StreamingContext(StreamingContextStates.All), quatSS);
             formatter.SurrogateSelector = surrogateSelector;
 
-            FileStream file = File.Create(saveLocation);
+            FileStream file = File.Create(savePath + fileName);
             formatter.Serialize(file, poseDict);
             file.Close();
         }

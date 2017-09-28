@@ -9,13 +9,13 @@ using Valve.VR;
 
 namespace PoseRecorder
 {
+    [ExecuteInEditMode]
     public class HumanPoseReader : MonoBehaviour, TimelineCallable.TimelineCallable
     {
-        [Header("File Location")]
-        public string loadLocation;
+        public string loadPath;
 
-        [Header("Options")]
-        public bool playOnAwake = true;
+        public bool playOnAwake = false;
+        public bool loadInEditor = false;
 
         private Avatar avatar;
         private HumanPoseHandler poseHandler;
@@ -25,6 +25,7 @@ namespace PoseRecorder
         private List<float> sortedKeys;
 
         private bool isPlaying = false;
+        private bool pathChanged = false;
         private float currentTime = 0f;
         private int currentFrame = 0;
         private int totalFrames = 0;
@@ -38,8 +39,23 @@ namespace PoseRecorder
                 return;
             }
             poseHandler = new HumanPoseHandler(avatar, transform);
-            loadLocation = Application.dataPath + "/Animations/TestAnimation.pose";
-            LoadPoseData();
+        }
+
+        private void OnValidate()
+        {
+            if (loadPath != null)
+            {
+                pathChanged = true;
+            }
+        }
+
+        private void Update()
+        {
+            if (pathChanged)
+            {
+                pathChanged = false;
+                LoadPoseData();
+            }
         }
 
         private void LateUpdate()
@@ -61,13 +77,11 @@ namespace PoseRecorder
                 {
                     float oldTime = currentTime;
                     currentTime += Time.deltaTime;
-                    float startFrameTime;
                     float endFrameTime;
-                    while (currentFrame < totalFrames - 1)
+                    while (currentFrame < totalFrames)
                     {
-                        startFrameTime = sortedKeys[currentFrame];
-                        endFrameTime = sortedKeys[currentFrame + 1];
-                        if (startFrameTime <= currentTime && endFrameTime >= currentTime)
+                        endFrameTime = sortedKeys[currentFrame];
+                        if (endFrameTime >= currentTime)
                         {
                             float progessThroughFrame = (currentTime - oldTime) / (endFrameTime - oldTime);
                             if (progessThroughFrame > 1 || progessThroughFrame < 0)
@@ -114,15 +128,20 @@ namespace PoseRecorder
             return poseToReturn;
         }
 
-        private void SetPose()
-        {
-            currentPose = poseDict[sortedKeys[currentFrame++]];
-            poseHandler.SetHumanPose(ref currentPose);
-        }
-
         private void LoadPoseData()
         {
-            Debug.Log("===LOADING POSE DATA===");
+            if (!Application.isPlaying && !loadInEditor)
+            {
+                return;
+            }
+            if (loadPath == null)
+            {
+                Debug.LogError("***NO LOAD PATH SET ON " + gameObject.name + "***");
+                return;
+            }
+            string[] splitPath = loadPath.Split('/');
+            string filename = splitPath[splitPath.Length - 1];
+            Debug.Log("===LOADING POSE: " + filename.ToUpper() + "===");
             
             BinaryFormatter formatter = new BinaryFormatter();
             SurrogateSelector surrogateSelector = new SurrogateSelector();
@@ -133,7 +152,7 @@ namespace PoseRecorder
             surrogateSelector.AddSurrogate(typeof(Quaternion), new StreamingContext(StreamingContextStates.All), quatSS);
             formatter.SurrogateSelector = surrogateSelector;
 
-            FileStream file = File.Open(loadLocation, FileMode.Open);
+            FileStream file = File.Open(loadPath, FileMode.Open);
 
             Dictionary<float, RecordablePose> recordablePoseData = (Dictionary<float, RecordablePose>)formatter.Deserialize(file);
             file.Close();
@@ -150,7 +169,7 @@ namespace PoseRecorder
             sortedKeys = new List<float>(recordablePoseData.Keys);
             sortedKeys.Sort();
             totalFrames = recordablePoseData.Keys.Count;
-            Debug.Log("===LOADING COMPLETE===");
+            Debug.Log("===SUCCESSFULLY LOADED " + filename.ToUpper() + "===");
             if (playOnAwake)
             {
                 StartPlaying();
