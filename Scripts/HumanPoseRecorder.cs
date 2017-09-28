@@ -73,7 +73,8 @@ namespace PoseRecorder {
         }
     }
 
-    public class HumanPoseRecorder : MonoBehaviour {
+    public class HumanPoseRecorder : MonoBehaviour, TimelineCallable.TimelineCallable
+    {
         public int frameNo = 1000;
 
         [Header("VR")]
@@ -129,9 +130,7 @@ namespace PoseRecorder {
             {
                 if (rightDevice.GetPress(stopRecordKey))
                 {
-                    recording = false;
-                    Debug.Log("===END RECORDING===");
-                    SavePoseData();
+                    StopRecording();
                 } else
                 {
                     currentTime += Time.deltaTime;
@@ -142,12 +141,24 @@ namespace PoseRecorder {
             {
                 if (rightDevice.GetPress(startRecordKey))
                 {
-                    Debug.Log("===START RECORDING===");
-                    currentTime = 0f;
-                    recording = true;
-                    UpdatePose();
+                    StartRecording();
                 }
             }
+        }
+
+        public void StartRecording()
+        {
+            Debug.Log("===START RECORDING===");
+            currentTime = 0f;
+            recording = true;
+            UpdatePose();
+        }
+
+        public void StopRecording()
+        {
+            recording = false;
+            Debug.Log("===END RECORDING===");
+            SavePoseData();
         }
 
         private void UpdatePose()
@@ -177,6 +188,11 @@ namespace PoseRecorder {
             FileStream file = File.Create(saveLocation);
             formatter.Serialize(file, poseDict);
             file.Close();
+        }
+
+        public void OnTimelineEvent()
+        {
+            StartRecording();
         }
     }
 }

@@ -9,10 +9,13 @@ using Valve.VR;
 
 namespace PoseRecorder
 {
-    public class HumanPoseReader : MonoBehaviour
+    public class HumanPoseReader : MonoBehaviour, TimelineCallable.TimelineCallable
     {
         [Header("File Location")]
         public string loadLocation;
+
+        [Header("Options")]
+        public bool playOnAwake = true;
 
         private Avatar avatar;
         private HumanPoseHandler poseHandler;
@@ -45,12 +48,7 @@ namespace PoseRecorder
             {
                 if (Input.GetKey(KeyCode.Space))
                 {
-                    isPlaying = true;
-                    currentFrame = 0;
-                    currentTime = 0f;
-                    Debug.Log("===STARTED PLAYING ANIMATION===");
-                    currentPose = poseDict[sortedKeys[currentFrame++]];
-                    poseHandler.SetHumanPose(ref currentPose);
+                    StartPlaying();
                 }
             } else
             {
@@ -88,6 +86,16 @@ namespace PoseRecorder
                     }
                 }
             }
+        }
+
+        private void StartPlaying()
+        {
+            isPlaying = true;
+            currentFrame = 0;
+            currentTime = 0f;
+            Debug.Log("===STARTED PLAYING ANIMATION===");
+            currentPose = poseDict[sortedKeys[currentFrame++]];
+            poseHandler.SetHumanPose(ref currentPose);
         }
 
         private HumanPose getPoseLerp(float progress, HumanPose currentPose, HumanPose nextPose)
@@ -143,6 +151,15 @@ namespace PoseRecorder
             sortedKeys.Sort();
             totalFrames = recordablePoseData.Keys.Count;
             Debug.Log("===LOADING COMPLETE===");
+            if (playOnAwake)
+            {
+                StartPlaying();
+            }
+        }
+
+        public void OnTimelineEvent()
+        {
+            StartPlaying();
         }
     }
 }
